@@ -16,6 +16,7 @@
  */
 package org.apache.nifi.processors.standard.util;
 
+import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPReply;
@@ -109,7 +110,15 @@ public class FTPSTransfer implements FileTransfer {
             .defaultValue("false")
             .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
             .build();
-
+    public static final PropertyDescriptor IMPLICIT = new PropertyDescriptor.Builder()
+            .name("implicit")
+            .displayName("implicit")
+            .description("Use the FTPS implicit mode (true) or explicit mode (false)")
+            .required(false)
+            .allowableValues("true", "false")
+            .defaultValue("false")
+            .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
+            .build();
 
 
     private final ComponentLog logger;
@@ -504,6 +513,7 @@ public class FTPSTransfer implements FileTransfer {
             if (remoteHostName.equals(desthost)) {
                 // destination matches so we can keep our current session
                 resetWorkingDirectory();
+                LogFactory.getLog(getClass().getName()).info("REUSE CLIENT");
                 return client;
             } else {
                 // this flowFile is going to a different destination, reset session
@@ -511,10 +521,13 @@ public class FTPSTransfer implements FileTransfer {
             }
         }
 
+        LogFactory.getLog(getClass().getName()).info("GETTING CLIENT");
 
 
-        // we use the default : implicit false and negotiated TLS version (no SSL anymore)
-        this.client = new FTPSClient();
+
+
+        // we use the default : negotiated TLS version (no SSL anymore)
+        this.client = new FTPSClient(ctx.getProperty(IMPLICIT).evaluateAttributeExpressions().asBoolean());
         client.setBufferSize(ctx.getProperty(BUFFER_SIZE).asDataSize(DataUnit.B).intValue());
         client.setDataTimeout(ctx.getProperty(DATA_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
         client.setDefaultTimeout(ctx.getProperty(CONNECTION_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
@@ -525,6 +538,7 @@ public class FTPSTransfer implements FileTransfer {
 
         final String remoteHostname = ctx.getProperty(HOSTNAME).evaluateAttributeExpressions(flowFile).getValue();
         this.remoteHostName = remoteHostname;
+        logger.info("Destination host : "+remoteHostname);
         InetAddress inetAddress = null;
         try {
             inetAddress = InetAddress.getByAddress(remoteHostname, null);
@@ -534,25 +548,37 @@ public class FTPSTransfer implements FileTransfer {
         if (inetAddress == null) {
             inetAddress = InetAddress.getByName(remoteHostname);
         }
+        logger.info("InetAddress : "+inetAddress);
 
         final boolean useUtf8Encoding = ctx.getProperty(UTF8_ENCODING).isSet() ? ctx.getProperty(UTF8_ENCODING).asBoolean() : false;
         if (useUtf8Encoding) {
             client.setControlEncoding("UTF-8");
         }
+        logger.info("Port : "+ctx.getProperty(PORT).evaluateAttributeExpressions(flowFile).asInteger());
+        logger.info("########## Entering passive mode/EPSV");
+        client.enterLocalPassiveMode();
+        //client.setUseEPSVwithIPv4(true);
+        logger.info("########## Entered passive mode/EPSV");
 
         client.connect(inetAddress, ctx.getProperty(PORT).evaluateAttributeExpressions(flowFile).asInteger());
+        logger.info("########## CONNECTED !");
         this.closed = false;
         client.setDataTimeout(ctx.getProperty(DATA_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
         client.setSoTimeout(ctx.getProperty(CONNECTION_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
 
         final String username = ctx.getProperty(USERNAME).evaluateAttributeExpressions(flowFile).getValue();
         final String password = ctx.getProperty(PASSWORD).evaluateAttributeExpressions(flowFile).getValue();
+        logger.info("UserName : "+username);
+
         final boolean loggedIn = client.login(username, password);
+        logger.info("LOGGED IN");
         if (!loggedIn) {
             throw new IOException("Could not login for user '" + username + "'");
         }
 
+        logger.info("SEND PBSZ0 ");
         client.execPBSZ(0);
+        logger.info("SEND P");
         client.execPROT("P");
 
         final String connectionMode = ctx.getProperty(CONNECTION_MODE).getValue();
@@ -570,6 +596,7 @@ public class FTPSTransfer implements FileTransfer {
 
         this.homeDirectory = client.printWorkingDirectory();
 
+        logger.info("CLIENT OK");
         return client;
     }
 
