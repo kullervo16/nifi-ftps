@@ -42,6 +42,7 @@ public class FTPSTest {
         this.sot.setProperty(FileTransfer.USERNAME,"demo");
         this.sot.setProperty(FileTransfer.PASSWORD,"password");
         this.sot.setProperty(FTPSTransfer.ALLOW_SELFSIGNED,"false");
+        this.sot.setProperty(FTPSTransfer.IMPLICIT, "false");
 
         this.sot.run();
         assertEquals(1,this.sot.getFlowFilesForRelationship(ListFTPS.REL_SUCCESS).size());

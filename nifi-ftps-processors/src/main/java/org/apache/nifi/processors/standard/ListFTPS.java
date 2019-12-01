@@ -86,6 +86,7 @@ public class ListFTPS extends ListFileTransfer {
 //        properties.add(ListedEntityTracker.TRACKING_TIME_WINDOW);
 //        properties.add(ListedEntityTracker.INITIAL_LISTING_TARGET);
         properties.add(FTPSTransfer.ALLOW_SELFSIGNED);
+        properties.add(FTPSTransfer.IMPLICIT);
         return properties;
     }
 

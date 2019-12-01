@@ -114,9 +114,10 @@ public class FTPSTransfer implements FileTransfer {
             .name("implicit")
             .displayName("implicit")
             .description("Use the FTPS implicit mode (true) or explicit mode (false)")
-            .required(false)
+            .required(true)
             .allowableValues("true", "false")
             .defaultValue("false")
+            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
             .addValidator(StandardValidators.BOOLEAN_VALIDATOR)
             .build();
 
@@ -554,14 +555,20 @@ public class FTPSTransfer implements FileTransfer {
         if (useUtf8Encoding) {
             client.setControlEncoding("UTF-8");
         }
-        logger.info("Port : "+ctx.getProperty(PORT).evaluateAttributeExpressions(flowFile).asInteger());
-        logger.info("########## Entering passive mode/EPSV");
+        if(logger.isDebugEnabled()) {
+            logger.debug("Port : " + ctx.getProperty(PORT).evaluateAttributeExpressions(flowFile).asInteger());
+            logger.debug("########## Entering passive mode/EPSV");
+        }
         client.enterLocalPassiveMode();
-        //client.setUseEPSVwithIPv4(true);
-        logger.info("########## Entered passive mode/EPSV");
+
+        if(logger.isDebugEnabled()) {
+            logger.debug("########## Entered passive mode/EPSV");
+        }
 
         client.connect(inetAddress, ctx.getProperty(PORT).evaluateAttributeExpressions(flowFile).asInteger());
-        logger.info("########## CONNECTED !");
+        if(logger.isDebugEnabled()) {
+            logger.debug("########## CONNECTED !");
+        }
         this.closed = false;
         client.setDataTimeout(ctx.getProperty(DATA_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
         client.setSoTimeout(ctx.getProperty(CONNECTION_TIMEOUT).asTimePeriod(TimeUnit.MILLISECONDS).intValue());
@@ -575,10 +582,13 @@ public class FTPSTransfer implements FileTransfer {
         if (!loggedIn) {
             throw new IOException("Could not login for user '" + username + "'");
         }
-
-        logger.info("SEND PBSZ0 ");
+        if(logger.isDebugEnabled()) {
+            logger.debug("SEND PBSZ0 ");
+        }
         client.execPBSZ(0);
-        logger.info("SEND P");
+        if(logger.isDebugEnabled()) {
+            logger.info("SEND P");
+        }
         client.execPROT("P");
 
         final String connectionMode = ctx.getProperty(CONNECTION_MODE).getValue();
